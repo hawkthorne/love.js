@@ -5,8 +5,6 @@ const mustache = require('mustache');
 const fs = require('fs-extra');
 const crypto = require('crypto');
 const path = require('path');
-const klawSync = require('klaw-sync');
-const { sep, resolve } = require('path');
 const JSZip = require('jszip');
 
 commander
@@ -19,12 +17,12 @@ commander
     commander.input = input;
     commander.output = output;
   });
-commander._name = 'love.js'; // eslint-disable-line no-underscore-dangle
+commander._name = 'love.js';
 commander.parse(process.argv);
 
-const getMD5 = path => new Promise((resolve, reject) => {
+const getMD5 = pathname => new Promise((resolve, reject) => {
   const hash = crypto.createHash('md5');
-  const rs = fs.createReadStream(path);
+  const rs = fs.createReadStream(pathname);
   rs.on('error', reject);
   rs.on('data', chunk => hash.update(chunk));
   rs.on('end', () => resolve(hash.digest('hex')));
@@ -66,25 +64,24 @@ const getAdditionalInfo = async function getAdditionalInfo(parsedArgs) {
 };
 
 const getFiles = async function getFiles(args) {
-  const love_game = fs.readFileSync(args.input);
-  const zip = await JSZip.loadAsync(love_game);
-  const love_conf = await zip.file('conf.lua').async('string');
-  const title = love_conf.match(/t\.window\.title\s*=\s*(.*)\s*/);
-  const width = love_conf.match(/t\.window\.width\s*=\s*([0-9]+)\s*/);
-  const height = love_conf.match(/t\.window\.height\s*=\s*([0-9]+)\s*/);
+  const loveGame = fs.readFileSync(args.input);
+  const zip = await JSZip.loadAsync(loveGame);
+  const loveConf = await zip.file('conf.lua').async('string');
+  const title = loveConf.match(/t\.window\.title\s*=\s*(.*)\s*/);
+  const width = loveConf.match(/t\.window\.width\s*=\s*([0-9]+)\s*/);
+  const height = loveConf.match(/t\.window\.height\s*=\s*([0-9]+)\s*/);
   if (title) args.title = title[1].substring(1, title[1].length - 1);
-  if (width) args.window.width = parseInt(width[1]);
-  if (height) args.window.height = parseInt(height[1]);
+  if (width) args.window.width = parseInt(width[1], 10);
+  if (height) args.window.height = parseInt(height[1], 10);
   args.game_data_filename = path.basename(args.input).replace('.love', '.data');
   args.uuid = await getMD5(args.input);
 
-  // It should be a .love file
-  return [args, {path: resolve(args.input)}];
+  return [args, { path: path.resolve(args.input) }];
 };
 
 getAdditionalInfo(commander).then((args) => {
-  const outputDir = resolve(args.output);
-  const srcDir = resolve(__dirname, 'src');
+  const outputDir = path.resolve(args.output);
+  const srcDir = path.resolve(__dirname, 'src');
 
   getFiles(args).then(([args, file]) => {
     const buffer = fs.readFileSync(file.path);
@@ -99,7 +96,7 @@ getAdditionalInfo(commander).then((args) => {
 
     fs.mkdirsSync(`${outputDir}`);
 
-    const fldr_name = args.compat ? 'compat' : 'release';
+    const fldrName = args.compat ? 'compat' : 'release';
     const template = fs.readFileSync(`${srcDir}/index.html`, 'utf8');
     const renderedTemplate = mustache.render(template, args);
 
@@ -108,15 +105,15 @@ getAdditionalInfo(commander).then((args) => {
     fs.writeFileSync(`${outputDir}/${args.game_data_filename}`, buffer);
     fs.copySync(`${srcDir}/love-game.js`, `${outputDir}/love-game.js`);
     fs.copySync(`${srcDir}/game.js`, `${outputDir}/game.js`);
-    fs.copySync(`${srcDir}/${fldr_name}/love.js`, `${outputDir}/love.js`);
-    fs.copySync(`${srcDir}/${fldr_name}/love.wasm`, `${outputDir}/love.wasm`);
+    fs.copySync(`${srcDir}/${fldrName}/love.js`, `${outputDir}/love.js`);
+    fs.copySync(`${srcDir}/${fldrName}/love.wasm`, `${outputDir}/love.wasm`);
     fs.copySync(`${srcDir}/love-game.css`, `${outputDir}/love-game.css`);
 
-    if (fldr_name === 'release') {
-      fs.copySync(`${srcDir}/${fldr_name}/love.worker.js`, `${outputDir}/love.worker.js`);
+    if (fldrName === 'release') {
+      fs.copySync(`${srcDir}/${fldrName}/love.worker.js`, `${outputDir}/love.worker.js`);
     }
   });
 }).catch((e) => {
-  console.error(e.message); // eslint-disable-line no-console
+  console.error(e.message);
   process.exit(1);
 });

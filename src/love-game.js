@@ -13,7 +13,7 @@ class LoveGame extends HTMLElement {
     submit.value = "Play";
 
     const form = document.createElement("form");
-    form.addEventListener("submit", (_e) => {
+    form.addEventListener("submit", (_) => {
       this.init();
       submit.remove(); // Remove submit before removing the form to fix minor rendering bug
       form.remove();
@@ -98,23 +98,15 @@ class LoveGame extends HTMLElement {
     };
 
     this.loadLib(new URL("love.js", import.meta.url)).then(
-      success => {
+      _success => {
         this.Module.canvas.addEventListener("keydown", (event) => {
           // space and arrow keys
           if([32, 37, 38, 39, 40].indexOf(event.keyCode) > -1) {
             event.preventDefault();
           }
-          // TODO: Press "f" to toggle fullscreen?
-          if(event.keyCode == 70) {
-            if (document.fullscreenElement) {
-              document.exitFullscreen()
-            } else {
-              this.Module.goFullScreen();
-            }
-          }
         }, false);
 
-        window.onerror = (event) => {
+        window.onerror = (_event) => {
           // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
           this.Module.setStatus("Exception thrown, see JavaScript console");
           this.Module.setStatus = function(text) {
@@ -125,11 +117,11 @@ class LoveGame extends HTMLElement {
         this.Module.setStatus("Downloading...");
         import(new URL("game.js", import.meta.url)).then(({loadPackage}) => {
           loadPackage(this.Module);
-          Love(this.Module);
+          globalThis.Love(this.Module);
           this.Module.canvas.focus();
         });
       },
-      err => {throw new Error("Unable to load necessary libraries", { cause: err })}
+      err => {throw new Error("Unable to load necessary libraries", { cause: err });}
     );
   }
 
@@ -152,10 +144,10 @@ class LoveGame extends HTMLElement {
 
       script.onload = function () {
         resolve(url);
-      }
+      };
       script.onerror = function (error) {
         reject(error);
-      }
+      };
 
       document.head.appendChild(script);
     });

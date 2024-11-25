@@ -43,7 +43,7 @@ export function loadPackage(Module) {
   var REMOTE_PACKAGE_SIZE = Module["GAME_SIZE"];
   var PACKAGE_UUID = Module["UUID"];
 
-  function fetchRemotePackage(packageName, packageSize, callback, errback) {
+  function fetchRemotePackage(packageName, packageSize, callback, _errback) {
     var xhr = new XMLHttpRequest();
     xhr.open("GET", packageName, true);
     xhr.responseType = "arraybuffer";
@@ -80,10 +80,10 @@ export function loadPackage(Module) {
         if (Module["setStatus"]) Module["setStatus"]("Downloading data...");
       }
     };
-    xhr.onerror = function (event) {
+    xhr.onerror = function (_event) {
       throw new Error("NetworkError for: " + packageName);
     };
-    xhr.onload = function (event) {
+    xhr.onload = function (_event) {
       if (
         xhr.status == 200 ||
         xhr.status == 304 ||
@@ -118,7 +118,7 @@ export function loadPackage(Module) {
     }
     DataRequest.prototype = {
       requests: {},
-      open: function (mode, name) {
+      open: function (_mode, name) {
         this.name = name;
         this.requests[name] = this;
         Module["addRunDependency"]("fp " + this.name);
@@ -179,12 +179,10 @@ export function loadPackage(Module) {
         if (db.objectStoreNames.contains(PACKAGE_STORE_NAME)) {
           db.deleteObjectStore(PACKAGE_STORE_NAME);
         }
-        var packages = db.createObjectStore(PACKAGE_STORE_NAME);
 
         if (db.objectStoreNames.contains(METADATA_STORE_NAME)) {
           db.deleteObjectStore(METADATA_STORE_NAME);
         }
-        var metadata = db.createObjectStore(METADATA_STORE_NAME);
       };
       openRequest.onsuccess = function (event) {
         var db = event.target.result;
@@ -243,7 +241,7 @@ export function loadPackage(Module) {
         packageData,
         "package/" + packageName,
       );
-      putPackageRequest.onsuccess = function (event) {
+      putPackageRequest.onsuccess = function (_event) {
         var transaction_metadata = db.transaction(
           [METADATA_STORE_NAME],
           IDB_RW,
@@ -253,7 +251,7 @@ export function loadPackage(Module) {
           packageMeta,
           "metadata/" + packageName,
         );
-        putMetadataRequest.onsuccess = function (event) {
+        putMetadataRequest.onsuccess = function (_event) {
           callback(packageData);
         };
         putMetadataRequest.onerror = function (error) {
@@ -273,7 +271,6 @@ export function loadPackage(Module) {
         "bad input to processPackageData",
       );
       var byteArray = new Uint8Array(arrayBuffer);
-      var curr;
 
       // copy the entire loaded file into a spot in the heap. Files will refer to slices in that. They cannot be freed though
       // (we may be allocating before malloc is ready, during startup).

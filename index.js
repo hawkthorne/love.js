@@ -3,9 +3,11 @@ const packageJson = require('./package.json');
 const commander = require('commander');
 const mustache = require('mustache');
 const fs = require('fs-extra');
+const crypto = require('crypto');
+const path = require('path');
 const klawSync = require('klaw-sync');
 const { sep, resolve } = require('path');
-const uuid = require('uuid');
+const JSZip = require('jszip');
 
 commander
   .version(packageJson.version)
@@ -20,9 +22,13 @@ commander
 commander._name = 'love.js'; // eslint-disable-line no-underscore-dangle
 commander.parse(process.argv);
 
-const isDirectory = function isDirectory(path) {
-  return fs.statSync(path).isDirectory();
-};
+const getMD5 = path => new Promise((resolve, reject) => {
+  const hash = crypto.createHash('md5');
+  const rs = fs.createReadStream(path);
+  rs.on('error', reject);
+  rs.on('data', chunk => hash.update(chunk));
+  rs.on('end', () => resolve(hash.digest('hex')));
+});
 
 // prompt for args left out of the cli invocation
 const getAdditionalInfo = async function getAdditionalInfo(parsedArgs) {
@@ -38,111 +44,78 @@ const getAdditionalInfo = async function getAdditionalInfo(parsedArgs) {
   };
 
   const args = {
+    title: parsedArgs.title || 'A game made with LÖVE',
     memory: parsedArgs.memory,
     input: parsedArgs.input,
     output: parsedArgs.output,
     compat: parsedArgs.compatibility,
+    window: {
+      width: 800,
+      height: 600,
+    },
+    game_data_filename: 'game.data',
   };
   args.input = parsedArgs.input || await prompt('Love file or directory: ');
   args.output = parsedArgs.output || await prompt('Output directory: ');
-  args.title = parsedArgs.title || await prompt('Game name: ');
 
-  if (isDirectory(args.input)) {
-    args.arguments = JSON.stringify(['./']);
-  } else {
-    args.arguments = JSON.stringify(['./game.love']);
+  if (fs.statSync(args.input).isDirectory() || !args.input.endsWith('.love')) {
+    throw new Error('Input must be a .love game file');
   }
 
   return args;
 };
 
-const getFiles = function getFiles(input) {
-  const stats = fs.statSync(input);
-  if (stats.isDirectory()) {
-    return klawSync(input, { nodir: true });
-  }
+const getFiles = async function getFiles(args) {
+  const love_game = fs.readFileSync(args.input);
+  const zip = await JSZip.loadAsync(love_game);
+  const love_conf = await zip.file('conf.lua').async('string');
+  const title = love_conf.match(/t\.window\.title\s*=\s*(.*)\s*/);
+  const width = love_conf.match(/t\.window\.width\s*=\s*([0-9]+)\s*/);
+  const height = love_conf.match(/t\.window\.height\s*=\s*([0-9]+)\s*/);
+  if (title) args.title = title[1].substring(1, title[1].length - 1);
+  if (width) args.window.width = parseInt(width[1]);
+  if (height) args.window.height = parseInt(height[1]);
+  args.game_data_filename = path.basename(args.input).replace('.love', '.data');
+  args.uuid = await getMD5(args.input);
+
   // It should be a .love file
-  return [{
-    path: resolve(input),
-    stats,
-  }];
+  return [args, {path: resolve(args.input)}];
 };
 
 getAdditionalInfo(commander).then((args) => {
   const outputDir = resolve(args.output);
   const srcDir = resolve(__dirname, 'src');
 
-  const files = getFiles(args.input);
-  const dirs = isDirectory(args.input) ? klawSync(args.input, { nofile: true }) : [];
-  const dirRelativePaths = dirs.map(f => f.path.replace(new RegExp(`^.*${args.input}`), ''));
-
-  const createFilePaths = dirRelativePaths.map((path) => {
-    const splits = path.split(sep);
-    const length = splits.length - 1;
-    const directoryPath = splits.slice(0, length).join('/') || '/';
-    return `Module['FS_createPath']('${directoryPath}', '${splits[length]}', true, true);`;
-  });
-
-  const AUDIO_SUFFIXES = ['.ogg', '.wav', '.mp3', '.flac', '.xm'];
-  const fileMetadata = [];
-  const fileBuffers = [];
-  let currentByte = 0;
-  for (let i = 0; i < files.length; i += 1) {
-    const file = files[i];
-    const relativePath = isDirectory(args.input) ?
-                            file.path.replace(new RegExp(`^.*${args.input}`), '') :
-                            '/game.love';
+  getFiles(args).then(([args, file]) => {
     const buffer = fs.readFileSync(file.path);
-    fileMetadata.push({
-      filename: relativePath,
-      crunched: 0,
-      start: currentByte,
-      end: currentByte + buffer.length,
-      audio: AUDIO_SUFFIXES.reduce((isAudio, suffix) => isAudio || file.path.endsWith(suffix), false),
-    });
 
-    currentByte += buffer.length;
-    fileBuffers.push(buffer);
-  }
-  const totalBuffer = Buffer.concat(fileBuffers);
+    args.game_size = buffer.length;
 
-  if (args.memory < totalBuffer.length) {
-    throw new Error(
-      'The memory (-m, --memory [bytes]) allocated for your game should at least be as big as your assets. '
-      + `The total size of your assets is ${totalBuffer.length} bytes.`);
-  }
+    if (args.memory < buffer.length) {
+      throw new Error(
+        'The memory (-m, --memory [bytes]) allocated for your game should at least be as big as your assets. '
+        + `The total size of your assets is ${buffer.length} bytes.`);
+    }
 
-  const jsArgs = {
-    create_file_paths: createFilePaths.join('\n      '),
-    metadata: JSON.stringify({
-      package_uuid: uuid(),
-      remote_package_size: totalBuffer.length,
-      files: fileMetadata,
-    }),
-  };
-  const gameTemplate = fs.readFileSync(`${srcDir}/game.js`, 'utf8');
-  const renderedGameTemplate = mustache.render(gameTemplate, jsArgs);
+    fs.mkdirsSync(`${outputDir}`);
 
-  fs.mkdirsSync(`${outputDir}`);
-
-  const fldr_name = args.compat ? "compat" : "release";
-
-  {
-    const template = fs.readFileSync(`${srcDir}/${fldr_name}/index.html`, 'utf8');
+    const fldr_name = args.compat ? 'compat' : 'release';
+    const template = fs.readFileSync(`${srcDir}/index.html`, 'utf8');
     const renderedTemplate = mustache.render(template, args);
 
     fs.mkdirsSync(outputDir);
     fs.writeFileSync(`${outputDir}/index.html`, renderedTemplate);
-    fs.writeFileSync(`${outputDir}/game.js`, renderedGameTemplate);
-    fs.writeFileSync(`${outputDir}/game.data`, totalBuffer);
+    fs.writeFileSync(`${outputDir}/${args.game_data_filename}`, buffer);
+    fs.copySync(`${srcDir}/love-game.js`, `${outputDir}/love-game.js`);
+    fs.copySync(`${srcDir}/game.js`, `${outputDir}/game.js`);
     fs.copySync(`${srcDir}/${fldr_name}/love.js`, `${outputDir}/love.js`);
     fs.copySync(`${srcDir}/${fldr_name}/love.wasm`, `${outputDir}/love.wasm`);
-    fs.copySync(`${srcDir}/${fldr_name}/theme`, `${outputDir}/theme`);
+    fs.copySync(`${srcDir}/love-game.css`, `${outputDir}/love-game.css`);
 
-    if (fldr_name === "release") {
+    if (fldr_name === 'release') {
       fs.copySync(`${srcDir}/${fldr_name}/love.worker.js`, `${outputDir}/love.worker.js`);
     }
-  }
+  });
 }).catch((e) => {
   console.error(e.message); // eslint-disable-line no-console
   process.exit(1);

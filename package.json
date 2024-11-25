@@ -1,6 +1,6 @@
 {
   "name": "love.js",
-  "version": "11.4.1",
+  "version": "11.5.1",
   "description": "Tooling to support the Emscripten port of LÖVE.",
   "engines": {
     "node": ">=7.10.0",
@@ -39,6 +39,6 @@
     "fs-extra": "^3.0.1",
     "klaw-sync": "^2.1.0",
     "mustache": "^2.3.0",
-    "uuid": "^3.0.1"
+    "jszip": "^3.10.1"
   }
 }

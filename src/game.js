@@ -1,29 +1,7 @@
 "use strict";
 
 export function loadPackage(Module) {
-  if (!Module.expectedDataFileDownloads) {
-    Module.expectedDataFileDownloads = 0;
-    Module.finishedDataFileDownloads = 0;
-  }
-  Module.expectedDataFileDownloads++;
-  var PACKAGE_PATH;
-  if (typeof window === "object") {
-    PACKAGE_PATH = window["encodeURIComponent"](
-      window.location.pathname
-        .toString()
-        .substring(0, window.location.pathname.toString().lastIndexOf("/")) +
-        "/",
-    );
-  } else if (typeof location !== "undefined") {
-    // worker
-    PACKAGE_PATH = encodeURIComponent(
-      location.pathname
-        .toString()
-        .substring(0, location.pathname.toString().lastIndexOf("/")) + "/",
-    );
-  } else {
-    throw "using preloaded data can only be done on a web page or in a web worker";
-  }
+  var PACKAGE_PATH = Module["GAME_PATH"];
   var PACKAGE_NAME = Module["GAME_FILE"];
   var REMOTE_PACKAGE_BASE = Module["GAME_FILE"];
   if (
@@ -48,36 +26,13 @@ export function loadPackage(Module) {
     xhr.open("GET", packageName, true);
     xhr.responseType = "arraybuffer";
     xhr.onprogress = function (event) {
-      var url = packageName;
-      var size = packageSize;
-      if (event.total) size = event.total;
+      var total = packageSize;
       if (event.loaded) {
-        if (!xhr.addedTotal) {
-          xhr.addedTotal = true;
-          if (!Module.dataFileDownloads) Module.dataFileDownloads = {};
-          Module.dataFileDownloads[url] = {
-            loaded: event.loaded,
-            total: size,
-          };
-        } else {
-          Module.dataFileDownloads[url].loaded = event.loaded;
-        }
-        var total = 0;
-        var loaded = 0;
-        var num = 0;
-        for (var download in Module.dataFileDownloads) {
-          var data = Module.dataFileDownloads[download];
-          total += data.total;
-          loaded += data.loaded;
-          num++;
-        }
-        total = Math.ceil((total * Module.expectedDataFileDownloads) / num);
-        if (Module["setStatus"])
-          Module["setStatus"](
-            "Downloading data... (" + loaded + "/" + total + ")",
-          );
-      } else if (!Module.dataFileDownloads) {
-        if (Module["setStatus"]) Module["setStatus"]("Downloading data...");
+        Module["setStatus"](
+          "Downloading... (" + Module.humanFileSize(event.loaded) + "/" + Module.humanFileSize(total) + ")",
+        );
+      } else {
+        Module["setStatus"]("Downloading...");
       }
     };
     xhr.onerror = function (_event) {
@@ -156,11 +111,6 @@ export function loadPackage(Module) {
       ).open("GET", files[i].filename);
     }
 
-    var indexedDB =
-      window.indexedDB ||
-      window.mozIndexedDB ||
-      window.webkitIndexedDB ||
-      window.msIndexedDB;
     var IDB_RO = "readonly";
     var IDB_RW = "readwrite";
     var DB_NAME = "EM_PRELOAD_CACHE";
@@ -204,7 +154,7 @@ export function loadPackage(Module) {
         if (!result) {
           return callback(false);
         } else {
-          return callback(PACKAGE_UUID === result.uuid);
+          return callback(PACKAGE_UUID && PACKAGE_UUID === result.uuid);
         }
       };
       getRequest.onerror = function (error) {
@@ -264,7 +214,6 @@ export function loadPackage(Module) {
     }
 
     function processPackageData(arrayBuffer) {
-      Module.finishedDataFileDownloads++;
       assert(arrayBuffer, "Loading data file failed.");
       assert(
         arrayBuffer instanceof ArrayBuffer,
@@ -345,8 +294,6 @@ export function loadPackage(Module) {
         preloadFallback,
       );
     }, preloadFallback);
-
-    if (Module["setStatus"]) Module["setStatus"]("Downloading...");
   }
   if (Module["calledRun"]) {
     runWithFS();

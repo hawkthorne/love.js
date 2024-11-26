@@ -11,15 +11,13 @@
   </head>
   <body>
     <h1>{{title}}</h1>
-    <love-game data-memory="{{memory}}" data-game-size="{{game_size}}" data-game-file="{{game_data_filename}}" data-uuid="{{uuid}}">
-      <canvas role="application" tabindex="0" width="{{window.width}}" height="{{window.height}}">
-        <!-- In the case of JS not being available, this black placeholder image fills the space the canvas would have -->
-        <img width="{{window.width}}"
-             height="{{window.height}}"
-             alt=""
-             aria-hidden="true"
-             src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVQImWNgYGAAAAAEAAGjChXjAAAAAElFTkSuQmCC">
-      </canvas>
+    <love-game data-memory="{{memory}}" data-game-size="{{game_size}}" data-game-file="{{game_data_filename}}" data-etag="{{etag}}">
+      <img width="{{window.width}}"
+           height="{{window.height}}"
+           alt=""
+           aria-hidden="true"
+           src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVQImWNgYGAAAAAEAAGjChXjAAAAAElFTkSuQmCC">
+      <canvas role="application" tabindex="0" width="{{window.width}}" height="{{window.height}}"></canvas>
       <noscript>
         Sorry, this game requires JavaScript.
       </noscript>

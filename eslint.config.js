@@ -8,13 +8,14 @@ module.exports = [
       globals: {
         ...globals.node,
         ...globals.browser,
-      }
+      },
     },
     rules: {
-      "no-unused-vars": [2, {"args": "all", "argsIgnorePattern": "^_"}]
-    }
+      semi: "error",
+      "no-unused-vars": [2, { args: "all", argsIgnorePattern: "^_" }],
+    },
   },
   {
-    ignores: ["**/*/love.js"],
-  }
+    ignores: ["**/*/love.js", "**/*/love.worker.js"],
+  },
 ];

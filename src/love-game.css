@@ -2,10 +2,18 @@ love-game {
     display: flex;
     justify-content: center;
     position: relative;
-    background: #000;
     margin-inline: auto;
     color: #FFF;
     margin-block: 1rem;
+
+    & *+* {
+        box-sizing: border-box;
+    }
+
+    & img {
+        display: block;
+        object-fit: cover;
+    }
 
     /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
     & canvas {
@@ -17,8 +25,8 @@ love-game {
         max-width: 100%;
     }
 
-    & img {
-        display: block;
+    & img + canvas {
+        display: none;
     }
 
     & .pregame,
@@ -37,19 +45,37 @@ love-game {
         align-items: center;
         padding: 2rem;
 
-        & input[type="submit"] {
+        & button[type="submit"] {
             cursor: pointer;
-            width: 200px;
-            height: 110px;
+            padding: 2rem 4rem;
             border: none;
             background: #FFF;
+            box-shadow: 0px 0px 0px rgba(255, 255, 255, 0);
             font-size: 2rem;
+            font-weight: 600;
             text-transform: uppercase;
             color: #000;
-            transition: 0.125s ease-in-out scale;
+            transition: 0.125s ease-in-out all;
 
             &:hover {
                 scale: 1.2;
+                background: #FFF;
+                box-shadow: 5px 5px 0px rgba(255, 255, 255, 0.5);
+            }
+
+            small {
+                font-size: 1rem;
+                font-weight: 400;
+                display: block;
+                color: #333;
+
+                &::before {
+                    content: "(";
+                }
+
+                &::after {
+                    content: ")";
+                }
             }
         }
     }
